@@ -2,8 +2,11 @@
 import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Upload, FileText, TrendingUp } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Upload, FileText, TrendingUp, AlertCircle } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { useToast } from '@/hooks/use-toast';
 
 interface DataUploadProps {
   onDataLoad: (data: any[]) => void;
@@ -11,6 +14,9 @@ interface DataUploadProps {
 
 export const DataUpload = ({ onDataLoad }: DataUploadProps) => {
   const [selectedDataset, setSelectedDataset] = useState<string>('');
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadedData, setUploadedData] = useState<any[]>([]);
+  const { toast } = useToast();
   
   // Sample data that mimics the air passenger dataset
   const sampleData = Array.from({ length: 144 }, (_, i) => ({
@@ -21,8 +27,95 @@ export const DataUpload = ({ onDataLoad }: DataUploadProps) => {
 
   const handleLoadSampleData = () => {
     setSelectedDataset('Air Passenger');
+    setUploadedData(sampleData);
     onDataLoad(sampleData);
   };
+
+  const parseCSV = (csvText: string) => {
+    const lines = csvText.trim().split('\n');
+    if (lines.length < 2) {
+      throw new Error('CSV file must have at least a header and one data row');
+    }
+
+    const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+    const data = [];
+
+    // Look for common column names
+    const timeColumn = headers.findIndex(h => 
+      h.includes('time') || h.includes('date') || h.includes('year') || h.includes('month')
+    );
+    const valueColumn = headers.findIndex(h => 
+      h.includes('value') || h.includes('price') || h.includes('count') || h.includes('amount')
+    );
+
+    if (timeColumn === -1 || valueColumn === -1) {
+      throw new Error('CSV must contain time/date and value columns');
+    }
+
+    for (let i = 1; i < lines.length; i++) {
+      const values = lines[i].split(',').map(v => v.trim());
+      if (values.length >= Math.max(timeColumn, valueColumn) + 1) {
+        const timeValue = parseFloat(values[timeColumn]) || i;
+        const dataValue = parseFloat(values[valueColumn]);
+        
+        if (!isNaN(dataValue)) {
+          data.push({
+            time: timeValue,
+            value: dataValue,
+            date: values[timeColumn]
+          });
+        }
+      }
+    }
+
+    if (data.length === 0) {
+      throw new Error('No valid data rows found in CSV');
+    }
+
+    return data;
+  };
+
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    if (!file.name.toLowerCase().endsWith('.csv')) {
+      toast({
+        variant: "destructive",
+        title: "Invalid file type",
+        description: "Please upload a CSV file.",
+      });
+      return;
+    }
+
+    setIsUploading(true);
+
+    try {
+      const text = await file.text();
+      const parsedData = parseCSV(text);
+      
+      setSelectedDataset(file.name);
+      setUploadedData(parsedData);
+      onDataLoad(parsedData);
+      
+      toast({
+        title: "File uploaded successfully",
+        description: `Loaded ${parsedData.length} data points from ${file.name}`,
+      });
+    } catch (error) {
+      toast({
+        variant: "destructive",
+        title: "Upload failed",
+        description: error instanceof Error ? error.message : "Failed to parse CSV file",
+      });
+    } finally {
+      setIsUploading(false);
+      // Reset the input
+      event.target.value = '';
+    }
+  };
+
+  const displayData = uploadedData.length > 0 ? uploadedData : sampleData;
 
   return (
     <div className="space-y-6">
@@ -69,9 +162,23 @@ export const DataUpload = ({ onDataLoad }: DataUploadProps) => {
                     <p className="text-sm text-gray-500">Custom dataset upload</p>
                   </div>
                 </div>
-                <Button variant="outline" className="w-full" disabled>
-                  Coming Soon
-                </Button>
+                <div className="space-y-3">
+                  <Label htmlFor="csv-upload" className="sr-only">
+                    Upload CSV file
+                  </Label>
+                  <Input
+                    id="csv-upload"
+                    type="file"
+                    accept=".csv"
+                    onChange={handleFileUpload}
+                    disabled={isUploading}
+                    className="cursor-pointer"
+                  />
+                  <div className="flex items-center space-x-2 text-xs text-gray-500">
+                    <AlertCircle className="w-3 h-3" />
+                    <span>CSV should have time/date and value columns</span>
+                  </div>
+                </div>
               </CardContent>
             </Card>
           </div>
@@ -87,7 +194,7 @@ export const DataUpload = ({ onDataLoad }: DataUploadProps) => {
               <CardContent>
                 <div className="h-80">
                   <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={sampleData}>
+                    <LineChart data={displayData}>
                       <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
                       <XAxis 
                         dataKey="time" 
@@ -125,11 +232,13 @@ export const DataUpload = ({ onDataLoad }: DataUploadProps) => {
                 
                 <div className="grid grid-cols-4 gap-4 mt-6">
                   <div className="text-center p-3 bg-white rounded-lg">
-                    <p className="text-2xl font-bold text-blue-600">{sampleData.length}</p>
+                    <p className="text-2xl font-bold text-blue-600">{displayData.length}</p>
                     <p className="text-sm text-gray-500">Data Points</p>
                   </div>
                   <div className="text-center p-3 bg-white rounded-lg">
-                    <p className="text-2xl font-bold text-green-600">12</p>
+                    <p className="text-2xl font-bold text-green-600">
+                      {Math.round((displayData.length / 12) * 10) / 10}
+                    </p>
                     <p className="text-sm text-gray-500">Years</p>
                   </div>
                   <div className="text-center p-3 bg-white rounded-lg">
