@@ -17,14 +17,43 @@ export const Prediction = ({ data }: PredictionProps) => {
   const [timeUnit, setTimeUnit] = useState('months');
   const [hasPredictions, setHasPredictions] = useState(false);
 
+  // Check if data is available
+  if (!data || data.length === 0) {
+    return (
+      <div className="space-y-6">
+        <Card className="border-0 shadow-lg bg-white/70 backdrop-blur-sm">
+          <CardHeader>
+            <CardTitle className="flex items-center space-x-2">
+              <Target className="w-5 h-5 text-orange-500" />
+              <span>No Data Available</span>
+            </CardTitle>
+            <CardDescription>
+              Please go back to Step 1 and load a dataset before generating predictions.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="text-center py-12">
+            <p className="text-gray-500 mb-4">
+              You need to load data first to use the prediction functionality.
+            </p>
+            <p className="text-sm text-gray-400">
+              Navigate to "Data Setup" to get started.
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   // Generate sample predictions
   const generatePredictions = () => {
     setHasPredictions(true);
   };
 
   const lastValue = data[data.length - 1]?.value || 500;
+  const lastTime = data[data.length - 1]?.time || 2023;
+  
   const predictions = Array.from({ length: forecastPeriods[0] }, (_, i) => ({
-    time: data[data.length - 1].time + (i + 1) / 12,
+    time: lastTime + (i + 1) / 12,
     predicted: lastValue + i * 10 + Math.sin(i * 0.5) * 20 + Math.random() * 30,
     upper: lastValue + i * 10 + Math.sin(i * 0.5) * 20 + Math.random() * 30 + 50,
     lower: lastValue + i * 10 + Math.sin(i * 0.5) * 20 + Math.random() * 30 - 50,
