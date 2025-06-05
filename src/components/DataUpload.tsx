@@ -4,6 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Upload, FileText, TrendingUp, AlertCircle } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { useToast } from '@/hooks/use-toast';
@@ -16,6 +17,9 @@ export const DataUpload = ({ onDataLoad }: DataUploadProps) => {
   const [selectedDataset, setSelectedDataset] = useState<string>('');
   const [isUploading, setIsUploading] = useState(false);
   const [uploadedData, setUploadedData] = useState<any[]>([]);
+  const [availableColumns, setAvailableColumns] = useState<string[]>([]);
+  const [selectedValueColumn, setSelectedValueColumn] = useState<string>('');
+  const [rawParsedData, setRawParsedData] = useState<any[]>([]);
   const { toast } = useToast();
   
   // Sample data that mimics the air passenger dataset
@@ -28,7 +32,24 @@ export const DataUpload = ({ onDataLoad }: DataUploadProps) => {
   const handleLoadSampleData = () => {
     setSelectedDataset('Air Passenger');
     setUploadedData(sampleData);
+    setAvailableColumns([]);
+    setSelectedValueColumn('');
+    setRawParsedData([]);
     onDataLoad(sampleData);
+  };
+
+  const parseQuarterToDecimal = (quarter: string): number => {
+    // Parse formats like "1970Q1", "1970Q2", etc.
+    const match = quarter.match(/(\d{4})Q(\d)/);
+    if (match) {
+      const year = parseInt(match[1]);
+      const q = parseInt(match[2]);
+      return year + (q - 1) * 0.25;
+    }
+    
+    // Try to parse as regular number
+    const num = parseFloat(quarter);
+    return isNaN(num) ? 0 : num;
   };
 
   const parseCSV = (csvText: string) => {
@@ -37,34 +58,63 @@ export const DataUpload = ({ onDataLoad }: DataUploadProps) => {
       throw new Error('CSV file must have at least a header and one data row');
     }
 
-    const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+    const headers = lines[0].split(/[,\t]/).map(h => h.trim());
     const data = [];
 
-    // Look for common column names
+    // Look for time column - prioritize "obs" then other common names
     const timeColumn = headers.findIndex(h => 
-      h.includes('time') || h.includes('date') || h.includes('year') || h.includes('month')
-    );
-    const valueColumn = headers.findIndex(h => 
-      h.includes('value') || h.includes('price') || h.includes('count') || h.includes('amount')
+      h.toLowerCase() === 'obs' || 
+      h.toLowerCase().includes('time') || 
+      h.toLowerCase().includes('date') || 
+      h.toLowerCase().includes('year') || 
+      h.toLowerCase().includes('month')
     );
 
-    if (timeColumn === -1 || valueColumn === -1) {
-      throw new Error('CSV must contain time/date and value columns');
+    if (timeColumn === -1) {
+      throw new Error('CSV must contain a time/date column (obs, time, date, year, or month)');
     }
 
-    for (let i = 1; i < lines.length; i++) {
-      const values = lines[i].split(',').map(v => v.trim());
-      if (values.length >= Math.max(timeColumn, valueColumn) + 1) {
-        const timeValue = parseFloat(values[timeColumn]) || i;
-        const dataValue = parseFloat(values[valueColumn]);
-        
-        if (!isNaN(dataValue)) {
-          data.push({
-            time: timeValue,
-            value: dataValue,
-            date: values[timeColumn]
-          });
+    // Find all numeric columns (excluding the time column)
+    const numericColumns: string[] = [];
+    
+    for (let i = 1; i < Math.min(lines.length, 6); i++) { // Check first few rows to determine numeric columns
+      const values = lines[i].split(/[,\t]/).map(v => v.trim());
+      headers.forEach((header, index) => {
+        if (index !== timeColumn && values[index] && values[index] !== 'NA') {
+          const num = parseFloat(values[index]);
+          if (!isNaN(num) && !numericColumns.includes(header)) {
+            numericColumns.push(header);
+          }
         }
+      });
+    }
+
+    if (numericColumns.length === 0) {
+      throw new Error('CSV must contain at least one numeric column');
+    }
+
+    // Parse all rows
+    for (let i = 1; i < lines.length; i++) {
+      const values = lines[i].split(/[,\t]/).map(v => v.trim());
+      if (values.length >= Math.max(timeColumn + 1, numericColumns.length)) {
+        const timeValue = parseQuarterToDecimal(values[timeColumn]);
+        const row: any = {
+          time: timeValue,
+          date: values[timeColumn]
+        };
+
+        // Add all numeric columns
+        numericColumns.forEach(colName => {
+          const colIndex = headers.indexOf(colName);
+          if (colIndex !== -1 && values[colIndex] && values[colIndex] !== 'NA') {
+            const numValue = parseFloat(values[colIndex]);
+            if (!isNaN(numValue)) {
+              row[colName] = numValue;
+            }
+          }
+        });
+
+        data.push(row);
       }
     }
 
@@ -72,7 +122,7 @@ export const DataUpload = ({ onDataLoad }: DataUploadProps) => {
       throw new Error('No valid data rows found in CSV');
     }
 
-    return data;
+    return { data, numericColumns };
   };
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -92,15 +142,30 @@ export const DataUpload = ({ onDataLoad }: DataUploadProps) => {
 
     try {
       const text = await file.text();
-      const parsedData = parseCSV(text);
+      const { data, numericColumns } = parseCSV(text);
       
       setSelectedDataset(file.name);
-      setUploadedData(parsedData);
-      onDataLoad(parsedData);
+      setRawParsedData(data);
+      setAvailableColumns(numericColumns);
+      
+      // If there's only one numeric column, select it automatically
+      if (numericColumns.length === 1) {
+        const valueColumn = numericColumns[0];
+        setSelectedValueColumn(valueColumn);
+        const processedData = data.map(row => ({
+          ...row,
+          value: row[valueColumn]
+        }));
+        setUploadedData(processedData);
+        onDataLoad(processedData);
+      } else {
+        // Multiple columns available, user needs to select one
+        setUploadedData([]);
+      }
       
       toast({
         title: "File uploaded successfully",
-        description: `Loaded ${parsedData.length} data points from ${file.name}`,
+        description: `Loaded ${data.length} data points from ${file.name}. ${numericColumns.length > 1 ? 'Please select a value column.' : ''}`,
       });
     } catch (error) {
       toast({
@@ -113,6 +178,16 @@ export const DataUpload = ({ onDataLoad }: DataUploadProps) => {
       // Reset the input
       event.target.value = '';
     }
+  };
+
+  const handleValueColumnSelect = (columnName: string) => {
+    setSelectedValueColumn(columnName);
+    const processedData = rawParsedData.map(row => ({
+      ...row,
+      value: row[columnName]
+    }));
+    setUploadedData(processedData);
+    onDataLoad(processedData);
   };
 
   const displayData = uploadedData.length > 0 ? uploadedData : sampleData;
@@ -176,17 +251,45 @@ export const DataUpload = ({ onDataLoad }: DataUploadProps) => {
                   />
                   <div className="flex items-center space-x-2 text-xs text-gray-500">
                     <AlertCircle className="w-3 h-3" />
-                    <span>CSV should have time/date and value columns</span>
+                    <span>CSV should have time/date column and numeric value columns</span>
                   </div>
                 </div>
               </CardContent>
             </Card>
           </div>
 
-          {selectedDataset && (
+          {availableColumns.length > 1 && selectedDataset && (
+            <Card className="border-0 bg-gradient-to-br from-yellow-50 to-orange-50">
+              <CardHeader>
+                <CardTitle className="text-lg">Select Value Column</CardTitle>
+                <CardDescription>
+                  Multiple numeric columns found. Please select which one to analyze.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Select value={selectedValueColumn} onValueChange={handleValueColumnSelect}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select a column to analyze" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableColumns.map((column) => (
+                      <SelectItem key={column} value={column}>
+                        {column}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </CardContent>
+            </Card>
+          )}
+
+          {selectedDataset && uploadedData.length > 0 && (
             <Card className="border-0 bg-gradient-to-br from-blue-50 to-purple-50">
               <CardHeader>
-                <CardTitle className="text-lg">Dataset Preview: {selectedDataset}</CardTitle>
+                <CardTitle className="text-lg">
+                  Dataset Preview: {selectedDataset}
+                  {selectedValueColumn && ` (${selectedValueColumn})`}
+                </CardTitle>
                 <CardDescription>
                   Time series visualization of your selected dataset
                 </CardDescription>
@@ -237,12 +340,12 @@ export const DataUpload = ({ onDataLoad }: DataUploadProps) => {
                   </div>
                   <div className="text-center p-3 bg-white rounded-lg">
                     <p className="text-2xl font-bold text-green-600">
-                      {Math.round((displayData.length / 12) * 10) / 10}
+                      {Math.round((displayData.length / 4) * 10) / 10}
                     </p>
                     <p className="text-sm text-gray-500">Years</p>
                   </div>
                   <div className="text-center p-3 bg-white rounded-lg">
-                    <p className="text-2xl font-bold text-purple-600">Monthly</p>
+                    <p className="text-2xl font-bold text-purple-600">Quarterly</p>
                     <p className="text-sm text-gray-500">Frequency</p>
                   </div>
                   <div className="text-center p-3 bg-white rounded-lg">
