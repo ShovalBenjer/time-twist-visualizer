@@ -1,17 +1,10 @@
-Excellent. Here is the final, fully integrated `README.md` file. It combines all the previously drafted sections into a single, polished document that meets all the specified requirements.
 
----
-
-### **Step 4: Final Integration**
-
-### Final `README.md`
-
+# Time-Twist Visualizer
 [![Build Status](https://img.shields.io/github/actions/workflow/status/ShovalBenjer/time-twist-visualizer/main.yml?branch=main&style=for-the-badge)](https://github.com/ShovalBenjer/time-twist-visualizer/actions)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg?style=for-the-badge)](https://opensource.org/licenses/MIT)
 [![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![React](https://img.shields.io/badge/React-61DAFB?style=for-the-badge&logo=react&logoColor=black)](https://reactjs.org/)
 
-# Time-Twist Visualizer
 
 Time-Twist Visualizer is an interactive, browser-based platform for end-to-end time-series analysis and forecasting. It empowers users to upload data, perform statistical tests, configure sophisticated predictive models, and visualize results through an intuitive, no-code interface.
 
