@@ -8,18 +8,19 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Upload, FileText, TrendingUp, AlertCircle } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { useToast } from '@/hooks/use-toast';
+import type { DataRow } from '@/lib/utils';
 
 interface DataUploadProps {
-  onDataLoad: (data: any[]) => void;
+  onDataLoad: (data: DataRow[]) => void;
 }
 
 export const DataUpload = ({ onDataLoad }: DataUploadProps) => {
   const [selectedDataset, setSelectedDataset] = useState<string>('');
   const [isUploading, setIsUploading] = useState(false);
-  const [uploadedData, setUploadedData] = useState<any[]>([]);
+  const [uploadedData, setUploadedData] = useState<DataRow[]>([]);
   const [availableColumns, setAvailableColumns] = useState<string[]>([]);
   const [selectedValueColumn, setSelectedValueColumn] = useState<string>('');
-  const [rawParsedData, setRawParsedData] = useState<any[]>([]);
+  const [rawParsedData, setRawParsedData] = useState<DataRow[]>([]);
   const { toast } = useToast();
   
   // Sample data that mimics the air passenger dataset
@@ -98,7 +99,7 @@ export const DataUpload = ({ onDataLoad }: DataUploadProps) => {
       const values = lines[i].split(/[,\t]/).map(v => v.trim());
       if (values.length >= Math.max(timeColumn + 1, numericColumns.length)) {
         const timeValue = parseQuarterToDecimal(values[timeColumn]);
-        const row: any = {
+        const row: DataRow = {
           time: timeValue,
           date: values[timeColumn]
         };
