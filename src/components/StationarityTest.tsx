@@ -7,9 +7,10 @@ import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { AlertTriangle, CheckCircle, TrendingUp, Activity } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from 'recharts';
+import type { DataRow } from '@/lib/utils';
 
 interface StationarityTestProps {
-  data: any[];
+  data: DataRow[];
 }
 
 export const StationarityTest = ({ data }: StationarityTestProps) => {

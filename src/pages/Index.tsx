@@ -5,10 +5,11 @@ import { DataUpload } from '@/components/DataUpload';
 import { StationarityTest } from '@/components/StationarityTest';
 import { ModelSelection } from '@/components/ModelSelection';
 import { Prediction } from '@/components/Prediction';
+import type { DataRow } from '@/lib/utils';
 
 const Index = () => {
   const [currentStep, setCurrentStep] = useState(1);
-  const [data, setData] = useState<any[]>([]);
+  const [data, setData] = useState<DataRow[]>([]);
 
   const renderCurrentStep = () => {
     switch (currentStep) {
