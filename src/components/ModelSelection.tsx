@@ -6,8 +6,16 @@ import { Slider } from '@/components/ui/slider';
 import { Badge } from '@/components/ui/badge';
 import { Settings, Zap, TrendingUp } from 'lucide-react';
 
+import type { DataRow } from '@/lib/utils';
+
+interface SarimaModel {
+  p: number; d: number; q: number;
+  P: number; D: number; Q: number; m: number;
+  aic: number; bic: number;
+}
+
 interface ModelSelectionProps {
-  data: any[];
+  data: DataRow[];
 }
 
 export const ModelSelection = ({ data }: ModelSelectionProps) => {
@@ -20,7 +28,7 @@ export const ModelSelection = ({ data }: ModelSelectionProps) => {
   const [QRange, setQRangeUpper] = useState([0, 2]);
   const [mRange, setMRangeUpper] = useState([12, 12]);
   const [isSearching, setIsSearching] = useState(false);
-  const [bestModel, setBestModel] = useState<any>(null);
+  const [bestModel, setBestModel] = useState<SarimaModel | null>(null);
 
   const startGridSearch = () => {
     setIsSearching(true);
