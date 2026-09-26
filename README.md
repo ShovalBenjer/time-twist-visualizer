@@ -122,3 +122,4 @@ Fork, branch off `main`, commit with a clear message, open a PR.
 ## License
 
 MIT. See [LICENSE](LICENSE).
+
